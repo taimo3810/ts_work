@@ -1,19 +1,24 @@
 import { parse } from "node:path";
 import { off, stdin, stdout } from "node:process";
 import { createInterface } from "node:readline/promises";
-import { Transform } from "node:stream";
-import { compileFunction } from "node:vm";
-import { brotliCompress } from "node:zlib";
+import chalk from "chalk";
 
-const ROWS = new Map<string, number>([
+
+const ALPHABETS = [...Array(26)].map((a, b) => String.fromCharCode(65 + b));
+
+let ROWS = new Map<string, number>([
     ["A", 0], ["B", 1], ["C", 2], ["D", 3], ["E", 4]
 ])
-const COlS = [1, 2, 3, 4, 5]
+let COLS = [1, 2, 3, 4, 5]
 const LIGHTCELL = "0"
 const DARKCELL = "."
 
-const MAX_BOARD_SIZE = 6;
+const MAX_BOARD_SIZE = 10;
 const MIN_BOARD_SIZE = 1;
+
+
+const range =
+  (start: number, end: number) => Array.from({length: (end - start + 1)}, (v, k) =>  k + start);
 
 function generate_board(board_size: number): string[][] {
     const board = []
@@ -36,25 +41,27 @@ function display_info(board: string[][], turn: number, time: number): void {
 
     // add board info
     const board_size = board.length;
-    info += "+" + "-".repeat(board_size) + "+" + "\n"
+    info += "+" + "-" +  "+" + "-".repeat(board_size) + "+" + "\n"
+    info += "| |" + COLS.join("") + "|\n"
+    info += "+" + "-" +  "+" + "-".repeat(board_size) + "+" + "\n"
     for (let i = 0; i < board_size; i++) {
-        info += "|"
+        info += "|" + [ ...ROWS.keys() ][i] + "|" 
         for (let j = 0; j < board_size; j++) {
             info += board[i][j];
         }
         info += "|\n"
     }
-    info += "+" + "-".repeat(board_size) + "+" + "\n"
+    info += "+" + "-" +  "+" + "-".repeat(board_size) + "+" + "\n"
     console.log(info)
 }
-function light(board: string[][], row: number, col: number): void {
+function light_out(board: string[][], row: number, col: number): void {
     const offsets: number[][] = [[0, 1], [1, 0], [0, -1], [-1, 0], [0, 0]]
     const board_size = board.length
     for (let offset_i = 0; offset_i < offsets.length; offset_i++){
-        let offset_row = offsets[offset_i][0];
-        let offset_col = offsets[offset_i][1];
-        let new_row: number = row + offset_row;
-        let new_col: number = col + offset_col;
+        const offset_row = offsets[offset_i][0];
+        const offset_col = offsets[offset_i][1];
+        const new_row: number = row + offset_row;
+        const new_col: number = col + offset_col;
         const row_condition = (0 <= new_row) && (new_row < board_size-1);
         const col_condition = (0 <= new_col) && (new_col < board_size-1);
         if (row_condition && col_condition) {
@@ -67,7 +74,7 @@ function judge_board(board: string[][]): boolean{
     const board_size = board.length
     for (let i = 0; i < board_size; i++) {
         for (let j = 0; j < board_size; j++) {
-            if (board[i][j] === DARKCELL){
+            if (board[i][j] === LIGHTCELL){
                 return false;
             }
         }
@@ -80,19 +87,24 @@ async function main(){
     const readline = createInterface({ input: stdin, output: stdout });
 
     // receive the board size from a user
-    let board_size: string = await readline.question("Please input the size of the board. > ");
-    while(board_size.match(/\d+/g) === null || !( MIN_BOARD_SIZE <= parseInt(board_size) && parseInt(board_size)  <= MAX_BOARD_SIZE) )
+    let board_size: string = await readline.question(chalk.blue("Please input the size of the board. > "));
+    while(board_size.match(/\d+/g) === null || !( MIN_BOARD_SIZE <= parseInt(board_size) && parseInt(board_size)  <= MAX_BOARD_SIZE) );
     {
         board_size = await readline.question("Please input the size of the board again. > ");
     }
-    console.log(`Board size is ${board_size} X ${board_size}`)
+    console.log(`Board size is ${board_size} X ${board_size}`);
 
+    // update ROWS and COLS (TODO: convert ROWS and COLS into local variables)
+    ROWS = new Map<string, number>(
+        Array.from({length: (parseInt(board_size)+1 - 0 + 1)}, (v, k) =>  [ALPHABETS[k], k + 0])
+    );
+    COLS = range(1, parseInt(board_size));
+    
     // generate the cells of the board randomly
     const board = generate_board(parseInt(board_size));
     
 
     let turn = 0;
-    
     const start = Date.now();
     while (true){
         turn += 1;
@@ -100,29 +112,31 @@ async function main(){
         display_info(board, turn, time_seconds);
 
         // receive an input
-        let row: string = await readline.question("Please input a row from [A, B, C, D, E]. > ");
+        let row: string = await readline.question(chalk.blue(`Please input a row from ${[...ROWS.keys()]}. > `));
         while (!ROWS.has(row)){
-            console.log(`Your input row(=${row}) is not contained in [A, B, C, D, E].`)
-            row = await readline.question("Please input a row from [A, B, C, D, E] again. > ");
+            console.log(chalk.red(`Your input row(=${row}) is not contained in ${[...ROWS.keys()]}.`));
+            row = await readline.question(chalk.blue(`Please input a row from ${[...ROWS.keys()]} again. > `));
         }
 
-        let col: string = await readline.question("Please input a column from [1, 2, 3, 4, 5]. > ");
-        while (!COlS.includes(parseInt(col))){
-            console.log(`Your input col(=${col}) is not contained in [1, 2, 3, 4, 5].`)
-            col = await readline.question("Please input a column from [1, 2, 3, 4, 5] again. > ");
+        let col: string = await readline.question(chalk.blue(`Please input a column from ${COLS}. > `));
+        while (!COLS.includes(parseInt(col))){
+            console.log(chalk.red(`Your input col(=${col}) is not contained in ${COLS}.`));
+            col = await readline.question(chalk.blue(`Please input a column from ${COLS} again. > `));
         }
         console.log(`Your choice is ${row+col}`)
         const row_num = ROWS.get(row);
         if (row_num === undefined){break;}
         
         
-        // light out the board
-        light(board, row_num, parseInt(col))
+        // light out cells in the board
+        light_out(board, row_num, parseInt(col)-1)
         
 
-        // judge 
+        // judge whether a user lights out all the cells in the board
         if ( judge_board(board) ){
-            console.log("You succeeded in turning on all the lights on the board!! Congrats!")
+            console.log("You succeeded in lighting out all the cells in the board!! Congrats!")
+            const time_seconds = (Date.now() - start)/1000;
+            console.log(`Your time record: ${time_seconds}(s), Your total turn is ${turn}.`)
             break;
         }
         
