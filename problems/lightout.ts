@@ -14,24 +14,11 @@ const LIGHTCELL = "0"
 const DARKCELL = "."
 
 const MAX_BOARD_SIZE = 10;
-const MIN_BOARD_SIZE = 1;
+const MIN_BOARD_SIZE = 3;
 
 
 const range =
   (start: number, end: number) => Array.from({length: (end - start + 1)}, (v, k) =>  k + start);
-
-function generate_board(board_size: number): string[][] {
-    const board = []
-    for (let i = 0; i < board_size; i++) {
-        const row_cells = []
-        for (let j = 0; j < board_size; j++) {
-            const cell = Math.random() > 0.5 ? LIGHTCELL : DARKCELL;
-            row_cells.push(cell)
-        }
-        board.push(row_cells)
-    }
-    return board
-}
 
 function display_info(board: string[][], turn: number, time: number): void {
 
@@ -57,6 +44,7 @@ function display_info(board: string[][], turn: number, time: number): void {
 function light_out(board: string[][], row: number, col: number): void {
     const offsets: number[][] = [[0, 1], [1, 0], [0, -1], [-1, 0], [0, 0]]
     const board_size = board.length
+    console.log(board_size, row, col)
     for (let offset_i = 0; offset_i < offsets.length; offset_i++){
         const offset_row = offsets[offset_i][0];
         const offset_col = offsets[offset_i][1];
@@ -65,7 +53,7 @@ function light_out(board: string[][], row: number, col: number): void {
         const row_condition = (0 <= new_row) && (new_row < board_size-1);
         const col_condition = (0 <= new_col) && (new_col < board_size-1);
         if (row_condition && col_condition) {
-            board[new_row][new_col] = LIGHTCELL ? DARKCELL : LIGHTCELL;
+            board[new_row][new_col] = board[new_row][new_col]==DARKCELL ? LIGHTCELL : DARKCELL;
         }
     }
 }
@@ -82,15 +70,30 @@ function judge_board(board: string[][]): boolean{
     return true;
 }
 
+function generate_board(board_size: number): string[][] {
+    // start with the board which its cells are lit out to gurantee that the generated board is solvable.
+    const board = Array.from(Array(board_size), () => Array.from(Array(board_size), () => DARKCELL));
+    for (let i = 0; i < board_size; i++) {
+        for (let j = 0; j < board_size; j++) {
+            const is_lit_out = Math.random() > 0.5 ? false : true;
+            console.log(is_lit_out)
+            if (is_lit_out)
+            {
+                light_out(board, i, j)
+            }
+        }
+    }
+    return board
+}
+
 async function main(){
 
     const readline = createInterface({ input: stdin, output: stdout });
 
     // receive the board size from a user
     let board_size: string = await readline.question(chalk.blue("Please input the size of the board. > "));
-    while(board_size.match(/\d+/g) === null || !( MIN_BOARD_SIZE <= parseInt(board_size) && parseInt(board_size)  <= MAX_BOARD_SIZE) );
-    {
-        board_size = await readline.question("Please input the size of the board again. > ");
+    while( board_size.match(/\d+/g) === null || !( MIN_BOARD_SIZE <= parseInt(board_size) && parseInt(board_size)  <= MAX_BOARD_SIZE) ){
+        board_size = await readline.question(chalk.red("Please input the size of the board again. > "));
     }
     console.log(`Board size is ${board_size} X ${board_size}`);
 
